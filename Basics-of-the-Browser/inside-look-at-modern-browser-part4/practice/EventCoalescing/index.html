@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Coalescing in Practice</title>
+</head>
+<body>
+    <div id="box" style="width:50px;height:50px;background:red;position:absolute;"></div>
+
+    <script>
+
+    document.addEventListener("pointermove", e => {
+        const start = performance.now();
+        while (performance.now() - start < 20) {
+          // intentionally block main thread
+        }
+
+        console.log(e.getCoalescedEvents().length);
+      });
+
+    /* Fast path vs Non-fast path scrolling
+
+Fast scrollable region ✅
+
+The compositor can scroll without consulting the main thread if all are true:
+	•	No listener that can cancel the scroll
+	•	Or the listener is passive: true
+	•	Or CSS touch-action says scrolling behavior is fixed
+
+➡️ Result:
+	•	Scroll handled entirely by compositor
+	•	Events may be coalesced
+	•	Main thread is not in the critical path
+
+⸻
+
+Non-fast scrollable region ❌
+
+This happens when:
+	•	There exists a listener that might cancel scrolling
+	•	Example: touchmove, wheel, pointermove without passive: true
+
+Even if your JS never calls preventDefault.
+
+➡️ Result:
+	•	Compositor must wait for the main thread
+	•	Scrolling becomes main-thread dependent
+	•	Coalescing still happens, but dispatch is delayed until rAF 
+
+    Even if your JS never calls preventDefault.
+
+
+    Why the compositor has to “ask” the main thread
+
+Because from the compositor’s point of view:
+	•	JS might:
+	•	call preventDefault()
+	•	change scroll behavior
+	•	read layout
+	•	mutate DOM
+
+The compositor cannot predict JS behavior.
+
+So it delays:
+	1.	Input arrives (wheel / touch / pointer)
+	2.	Compositor buffers / coalesces events
+	3.	Right before the next requestAnimationFrame
+	4.	Dispatches them to the main thread
+	5.	If JS does nothing → scroll proceeds
+	6.	If JS cancels → scroll is stopped
+*/
+
+/* 
+ Perfect — this is exactly the right moment to pin it down cleanly and concretely.
+Let’s reset and describe when event coalescing actually happens in real time, no fuzz.
+
+⸻
+
+One-sentence truth (anchor this)
+
+Event coalescing happens when multiple raw input events arrive faster than the main thread can (or should) process them before the next animation frame.
+
+That’s it. Everything else is detail.
+
+⸻
+
+Real-time timeline (step by step)
+
+Assume a 16.6ms frame budget (60Hz).
+
+1️⃣ Hardware generates raw events
+
+Your mouse / touchpad / finger produces events like:
+
+t=0ms   pointermove #1
+t=1ms   pointermove #2
+t=2ms   pointermove #3
+t=3ms   pointermove #4
+...
+
+These are raw — not JS yet.
+
+⸻
+
+2️⃣ Browser decides: “dispatch now or wait?”
+
+Chrome asks:
+	•	Is the main thread free right now?
+	•	Are we close to the next frame boundary?
+	•	Is this a high-frequency event?
+	•	Would dispatching each event waste time?
+
+If YES, dispatch immediately (no coalescing).
+If NO, queue & coalesce.
+
+⸻
+
+3️⃣ Coalescing phase (this is the key moment)
+
+Instead of doing:
+
+dispatch(pointermove #1)
+dispatch(pointermove #2)
+dispatch(pointermove #3)
+dispatch(pointermove #4)
+
+Chrome does:
+
+keep latest state
+store intermediate states internally
+
+No JS runs yet.
+
+⚠️ Important:
+	•	Events are not lost
+	•	They’re merged
+
+⸻
+
+4️⃣ Right before the next rAF ✨
+
+This sentence confused you earlier — now it should click:
+
+“Dispatched right before the next requestAnimationFrame.”
+
+Meaning:
+
+┌──────── Frame N ────────┐
+│ input → coalesce        │
+│ input → coalesce        │
+│ input → coalesce        │
+│                         │
+│ ▶ DISPATCH EVENT ◀     │  ← JS runs here
+│ ▶ rAF callback ◀       │
+│ style/layout/paint      │
+└─────────────────────────┘
+
+So:
+	•	JS sees 1 event
+	•	That event may contain many raw events
+
+⸻
+
+5️⃣ JS runs (this is “dispatch”)
+
+Now your handler finally runs:
+
+element.addEventListener("pointermove", e => {
+  console.log(e.getCoalescedEvents().length);
+});
+
+	•	If main thread was free earlier → length = 1
+	•	If under pressure → length = 5, 10, 20, etc.
+
+⸻
+
+Why coalescing is done (real reason)
+
+Because running JS like this:
+
+input → JS → layout → paint
+input → JS → layout → paint
+input → JS → layout → paint
+
+would:
+	•	Blow the frame budget
+	•	Starve rendering
+	•	Kill scrolling
+
+Coalescing turns it into:
+
+many inputs → 1 JS → 1 paint
+
+
+⸻
+
+When coalescing does NOT happen
+
+Very important:
+	•	Main thread idle ✅
+	•	Light page ✅
+	•	Low input rate ✅
+
+Then Chrome just dispatches immediately.
+
+That’s why you saw getCoalescedEvents() return 1.
+
+Nothing to merge.
+
+⸻
+
+When coalescing definitely happens
+	•	Heavy JS
+	•	Long tasks
+	•	Logging in handlers
+	•	Layout reads
+	•	Multiple listeners
+	•	DevTools open 😄
+
+⸻
+
+Final mental model (short)
+
+Raw events happen continuously.
+JS events happen at most once per frame.
+Coalescing is how Chrome enforces that.
+
+⸻
+
+If you want next, we can:
+	•	Draw the exact order: input → rAF → style → layout
+	•	Or compare coalescing vs throttling vs debouncing
+	•	Or show how games use coalesced events properly
+
+Just say the word 👌
+
+What Chrome does:
+
+1️⃣ It dispatches at most ONE event in that frame
+	•	That single dispatch contains:
+	•	the latest state
+	•	all coalesced raw events so far
+
+2️⃣ Any new raw events that arrive after dispatch
+	•	Are queued for the next frame
+	•	Not added to the already-dispatched event
+
+3️⃣ Next frame:
+	•	Browser repeats the process
+	•	New dispatch
+	•	New getCoalescedEvents() array
+*/
+
+   
+
+    </script>
+</body>
+</html>
