@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Thrashing Example</title>
+</head>
+<style>
+#box {
+  width: 50px;
+  height: 50px;
+  background: red;
+  position: absolute;
+  top: 50px;
+  left: 0;
+}
+</style>
+<body>
+    <div id="box"></div>
+    <script>
+        const box = document.getElementById("box");
+        
+        for (let i = 0; i < 500; i++) {
+            box.style.width = (100 + i) + "px";  // WRITE (mark dirty)
+            box.offsetWidth;                     // READ (force layout)
+    }   
+
+        
+    </script>
+</body>
+</html>

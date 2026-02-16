@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event loop yohoooo</title>
+</head>
+<body>
+    <button id="btn">Click</button>
+
+<script>
+    const btn = document.getElementById("btn");
+    console.log(btn);
+    
+  btn.onclick = async () => {
+    console.log("A"); 
+
+    const start = performance.now();
+            while (performance.now() - start < 200) {
+                // block for 200ms
+            }
+  };
+
+  /* Why is “now” appearing twice?
+
+Because DevTools shows:
+	•	The function as a standalone entry (aggregated total time)
+	•	The same function nested inside its parent call
+
+It’s not the same entry repeated.
+It’s two different perspectives of the same execution slice.
+
+Think of it like:
+
+“Show me all time spent in now()” */
+
+/* 
+
+Why does expanding Event: DOMActivate show Event: DOMActivate inside?
+
+Because events internally dispatch through layers.
+
+The browser fires:
+
+Event → internal dispatch → handlers → possibly another event
+
+So DevTools shows:
+	•	The outer dispatch
+	•	The inner processing
+    */
+</script>
+</body>
+</html>

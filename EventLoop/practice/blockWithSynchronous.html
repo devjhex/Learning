@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=, initial-scale=1.0">
+    <title>BlockWithSynchronouss</title>
+</head>
+    <style>
+#box { width: 50px; height: 50px; background: red; position: absolute; top: 50px; left: 0; }
+    </style>
+<body>
+    <div id="box"></div>
+
+    <script>
+        let box = document.getElementById("box"); 
+        let position = 0;
+
+        //function that will animate the box
+        function animate(){
+            position+=1;
+            box.style.transform = `translateX(${position}px)`; 
+
+             if (position < 500) {
+                requestAnimationFrame(animate);
+            }
+        }
+
+        requestAnimationFrame(animate);
+
+    // Block the main thread using microtasks
+      console.log("Blocking starts...");
+
+      //lets block with synchronous code
+      const start = performance.now();
+      while (performance.now() - start < 5000) {} // block 2 seconds
+
+    </script>
+</body>
+</html>

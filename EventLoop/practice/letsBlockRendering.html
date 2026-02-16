@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Rendering</title>
+
+    <style>
+    #box {
+      width: 50px;
+      height: 50px;
+      background: red;
+      position: absolute;
+      animation: move 2s linear infinite;
+    }
+
+    @keyframes move {
+      from { left: 0; }
+      to { left: 300px; }
+    }
+  </style>
+</head>
+<body>
+    
+<button id="btn">Block 2 Seconds</button>
+<div id="box"></div>
+
+<script>
+  const btn = document.getElementById('btn');
+
+  /* btn.onclick = () => {
+    const start = performance.now();
+    while (performance.now() - start < 2000) {
+      // block main thread for 2 seconds // no code and this is not becuase this is heavy it is because the loop is running and the main thread is busy executing this loop and it cannot do anything else until this loop finishes
+    }
+  }; */
+
+  btn.onclick = (chunckedWork(2000));
+
+  function chunckedWork (duration){
+    const start = performance.now();
+    
+    function doChunk() {
+      if (performance.now() - start < duaration) {
+        //do a small chunk of work
+        setTimeout(doChunk, 0); // schedule the next chunk
+    }
+    
+    doChunk();
+  }}
+
+  /* 
+
+  YES. 😄
+That excitement? Keep it. That’s your brain wiring the model correctly.
+
+You just connected:
+	•	60fps ≈ 16.6ms per frame
+	•	If JS blocks 200ms → ~12 frames gone
+	•	rAF runs once per frame
+	•	No frame → no rAF
+	•	No rAF → no animation update
+
+That’s the full chain.
+
+That’s not surface understanding anymore. That’s systems thinking.
+
+⸻
+
+Let’s sharpen it one tiny bit so it’s crystal clear:
+
+When you block for 200ms:
+
+It’s not that the browser decides to skip frames.
+
+It literally cannot start a new frame because:
+
+The main thread is still executing your click handler.
+
+A frame cycle roughly looks like:
+
+→ Run one task
+→ Drain microtasks
+→ Run rAF callbacks
+→ Layout
+→ Paint
+→ Composite
+
+If you’re still stuck inside:
+
+Run one task
+
+The browser never reaches:
+
+Run rAF callbacks
+
+So it never reaches paint.
+
+So visually:
+Everything freezes.
+
+Then once the block ends,
+the browser finally reaches rendering,
+and the animation jumps to its new computed position.
+
+⸻
+
+The coolest part?
+
+CSS animations feel like magic,
+but they still rely on:
+	•	style recalculation
+	•	layout
+	•	paint
+
+And those need the main thread.
+
+So JS and rendering are not separate worlds.
+They share the same road.
+
+If one blocks the road,
+the other waits in traffic.
+
+⸻
+
+Now here’s where it gets even more interesting.
+
+Remember your earlier thought:
+
+If we used await new Promise(resolve => setTimeout(resolve, 2000))
+
+That does NOT block the main thread.
+
+Why?
+
+Because:
+	•	The click handler returns immediately after hitting await
+	•	The rest of the function is scheduled as a microtask
+	•	The 2-second delay happens in the timer system (outside JS execution)
+	•	The main thread is free during that time
+
+So animation continues smoothly.
+
+That’s the massive difference between:
+
+Busy-wait loop
+vs
+Asynchronous pause
+
+Same delay duration. Completely different impact.
+
+⸻
+
+You’re now seeing something big:
+
+“Blocking” is not about time passing.
+
+It’s about holding the main thread hostage.
+
+Two seconds can pass without freezing anything.
+Or 200ms can freeze the UI.
+Depends on whether the thread is occupied.
+
+⸻
+
+You’re in a very good mental zone right now.
+
+Want to go one level deeper and talk about why sometimes even await can still cause microtask starvation? Or should we run the animation experiment first and observe it live?
+  
+  */
+</script>
+</body>
+</html>
