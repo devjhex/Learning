@@ -95,6 +95,25 @@ document.getElementById('nonFast').addEventListener('wheel', () => {
 // For most of the scroll events the passive is true that's why the scroll is smooth and the events are coalesced. But for the nonFast div, the passive is false, so the scroll is not smooth and the events are not coalesced.
 /* We will come back to this for the main threa learning */
 // Removed the global blocking listeners to isolate the effect to the nonFast div
+
+/* Real-World "Wrong Priority" Blocking
+In production code, blocking the main thread during scroll typically happens unintentionally due to:
+
+Expensive DOM Operations in Scroll Handlers
+
+Non-Passive Listeners That Don't Need to Be
+
+Large Data Processing During Scroll
+
+Parsing JSON, sorting arrays, rendering components—all synchronously in a scroll handler.
+
+The "correct" approach would be:
+
+Make it passive unless you need preventDefault(): { passive: true }
+Move heavy work to requestAnimationFrame, Web Workers, or debounce it
+Avoid blocking operations entirely
+
+ */
 </script>
 </body>
 </html>
